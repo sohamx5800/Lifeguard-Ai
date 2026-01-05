@@ -1,1 +1,1 @@
-# Lifeguard_Ai
+# Lifeguard_Ai[Accident Detection and Integrated Healthcare Support System DOC.pdf](https://github.com/user-attachments/files/24441537/Accident.Detection.and.Integrated.Healthcare.Support.System.DOC.pdf)
