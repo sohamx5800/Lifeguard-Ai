@@ -131,3 +131,9 @@ Instead:
     c = 2 ⋅ atan2(√a, √(1−a))
     d = R ⋅ c
 
+
+
+## Upload Firmware TO BLACKBOX :
+    1.Open Arduino IDE
+    2.Select ESP8266 board
+    3.Upload firmware.ino
