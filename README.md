@@ -32,6 +32,29 @@ Lifeguard AI automatically:
 5. Finds nearest hospital using Haversine algorithm
 6. Sends SMS + AI voice call automatically
 
+
+## Complete System Flow
+Vehicle Impact
+↓
+ESP8266 Detects Accident
+↓
+GPS Coordinates Captured
+↓
+Passenger AI Monitoring
+↓
+Accident Data Sent via GSM
+↓
+Server Authenticates Vehicle
+↓
+Haversine Finds Nearest Service
+↓
+Database Retrieves Official Contact
+↓
+SMS + AI Voice Call Triggered
+↓
+Emergency Services Respond
+
+
 All without requiring manual intervention.
 
 ---
