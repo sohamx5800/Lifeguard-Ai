@@ -120,6 +120,17 @@ Instead:
       "impact": "FRONTAL",
       "passengers": 2
     }
+
+## App Features:
+    1.Emergency dashboard
+    2.Live tracking
+    3.Medical chatbot
+    4.Digital prescription generation
+    5.Direct medicine ordering
+    6.Responder portal
+
+
+
     
 ## Haversine Algorithm (Nearest Service Detection):
   
