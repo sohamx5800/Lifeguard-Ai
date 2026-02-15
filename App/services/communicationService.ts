@@ -3,7 +3,7 @@
  * Responsible for bridging the frontend SOS trigger to the Twilio Dispatch Backend.
  */
 
- interface EmergencyPayload {
+interface EmergencyPayload {
   event_type: string;
   latitude: number;
   longitude: number;

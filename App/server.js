@@ -183,5 +183,5 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`\n LifeGuard AI Production Core running at http://localhost:${PORT}\n`);
+  console.log(`\n🚀 LifeGuard AI Production Core running at http://localhost:${PORT}\n`);
 });

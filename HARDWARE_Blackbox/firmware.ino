@@ -1,95 +1,139 @@
 #include <Wire.h>
 #include <MPU6050.h>
 #include <TinyGPS++.h>
+#include <SoftwareSerial.h>
 
-// -------- PINS --------
+// ================= CONFIG =================
+#define CAR_ID     "car0xc1"
+#define AUTH_KEY   "secure_key_123"
+#define SERVER_URL "http://192.168.1.100:5000/api/accident"
+
+// ================= PINS =================
 #define BTN_FRONT D5
 #define BTN_REAR  D6
 #define BUZZER    D7
 
-// -------- OBJECTS --------
+#define GSM_RX D4   // ESP RX <- GSM TX
+#define GSM_TX D3   // ESP TX -> GSM RX
+
+#define GPS_RX D8   // GPS TX -> ESP
+#define GPS_TX D0   // Not used
+
+// ================= OBJECTS =================
 TinyGPSPlus gps;
 MPU6050 mpu;
+SoftwareSerial gsm(GSM_RX, GSM_TX);
+SoftwareSerial gpsSerial(GPS_RX, GPS_TX);
 
 bool accidentTriggered = false;
 
-void setup() {
-  Serial.begin(9600);
+// ================= UTIL =================
+void sendAT(String cmd, int delayTime = 1000) {
+  gsm.println(cmd);
+  delay(delayTime);
+  while (gsm.available()) {
+    Serial.write(gsm.read());
+  }
+}
+
+void initGSM() {
+  Serial.println("[GSM] Initializing...");
+  sendAT("AT");
+  sendAT("AT+SAPBR=3,1,\"CONTYPE\",\"GPRS\"");
+  sendAT("AT+SAPBR=3,1,\"APN\",\"internet\"");  // Change if needed
+  sendAT("AT+SAPBR=1,1");
+  sendAT("AT+SAPBR=2,1");
+}
+
+void sendAccidentToServer(float lat, float lon, String impact) {
+
+  String json = "{";
+  json += "\"car_id\":\"" + String(CAR_ID) + "\",";
+  json += "\"auth_key\":\"" + String(AUTH_KEY) + "\",";
+  json += "\"lat\":" + String(lat, 6) + ",";
+  json += "\"lon\":" + String(lon, 6) + ",";
+  json += "\"impact\":\"" + impact + "\"";
+  json += "}";
+
+  Serial.println("[HTTP] Sending JSON:");
+  Serial.println(json);
+
+  sendAT("AT+HTTPINIT");
+  sendAT("AT+HTTPPARA=\"CID\",1");
+  sendAT("AT+HTTPPARA=\"URL\",\"" + String(SERVER_URL) + "\"");
+  sendAT("AT+HTTPPARA=\"CONTENT\",\"application/json\"");
+
+  gsm.print("AT+HTTPDATA=");
+  gsm.print(json.length());
+  gsm.println(",10000");
   delay(2000);
 
+  gsm.print(json);
+  delay(3000);
+
+  sendAT("AT+HTTPACTION=1", 5000);  // POST
+  sendAT("AT+HTTPREAD");
+  sendAT("AT+HTTPTERM");
+}
+
+// ================= SETUP =================
+void setup() {
+  Serial.begin(9600);
+  gsm.begin(9600);
+  gpsSerial.begin(9600);
+
+  delay(3000);
+
   Serial.println("=================================");
-  Serial.println(" LIFEGUARD AI - BLACK BOX (ESP8266)");
+  Serial.println(" LIFEGUARD AI BLACK BOX v2");
   Serial.println("=================================");
 
-  // I2C for MPU6050
   Wire.begin(D2, D1);
   mpu.initialize();
-
-  if (mpu.testConnection()) {
-    Serial.println("[MPU] MPU6050 connection SUCCESS");
-  } else {
-    Serial.println("[MPU] MPU6050 connection FAILED");
-  }
 
   pinMode(BTN_FRONT, INPUT_PULLUP);
   pinMode(BTN_REAR, INPUT_PULLUP);
   pinMode(BUZZER, OUTPUT);
   digitalWrite(BUZZER, LOW);
 
-  Serial.println("[GPS] Waiting for GPS data...");
-  Serial.println("[SYSTEM] Black Box Ready");
-  Serial.println("---------------------------------");
+  initGSM();
+
+  Serial.println("[SYSTEM] Ready");
 }
 
+// ================= LOOP =================
 void loop() {
 
-  // ================= GPS READ (EXACT LOGIC YOU TESTED) =================
-  while (Serial.available()) {
-    char c = Serial.read();
-    gps.encode(c);
+  // ---- Read GPS ----
+  while (gpsSerial.available()) {
+    gps.encode(gpsSerial.read());
   }
 
-  // ================= MPU6050 READ =================
+  // ---- Read MPU ----
   int16_t ax, ay, az;
   mpu.getAcceleration(&ax, &ay, &az);
 
   float accX = ax / 16384.0;
   float accY = ay / 16384.0;
   float accZ = az / 16384.0;
-  float accMagnitude = sqrt(accX * accX + accY * accY + accZ * accZ);
+  float magnitude = sqrt(accX*accX + accY*accY + accZ*accZ);
 
-  // MPU Debug
-  Serial.print("[MPU] AX:");
-  Serial.print(accX, 2);
-  Serial.print(" AY:");
-  Serial.print(accY, 2);
-  Serial.print(" AZ:");
-  Serial.print(accZ, 2);
-  Serial.print(" | MAG:");
-  Serial.println(accMagnitude, 2);
-
-  // ================= BUTTONS =================
   bool frontImpact = digitalRead(BTN_FRONT) == LOW;
   bool rearImpact  = digitalRead(BTN_REAR) == LOW;
 
-  // ================= ACCIDENT DETECTION =================
-  if ((frontImpact || rearImpact || accMagnitude > 2.2) && !accidentTriggered) {
+  if ((frontImpact || rearImpact || magnitude > 2.2) && !accidentTriggered) {
 
     accidentTriggered = true;
     digitalWrite(BUZZER, HIGH);
 
-    Serial.println("🚨 ACCIDENT_DETECTED");
+    Serial.println("ACCIDENT DETECTED");
 
-    // -------- WAIT FOR GPS FIX (CRITICAL FIX) --------
     unsigned long start = millis();
     bool gpsValid = false;
 
-    Serial.println("[GPS] Acquiring coordinates...");
-
-    while (millis() - start < 5000) {   // wait up to 5 seconds
-      while (Serial.available()) {
-        char c = Serial.read();
-        gps.encode(c);
+    while (millis() - start < 5000) {
+      while (gpsSerial.available()) {
+        gps.encode(gpsSerial.read());
       }
       if (gps.location.isUpdated()) {
         gpsValid = true;
@@ -97,25 +141,24 @@ void loop() {
       }
     }
 
-    // -------- PRINT GPS DATA --------
+    float lat = 0.0;
+    float lon = 0.0;
+
     if (gpsValid) {
-      Serial.print("LAT:");
-      Serial.println(gps.location.lat(), 6);
-      Serial.print("LON:");
-      Serial.println(gps.location.lng(), 6);
+      lat = gps.location.lat();
+      lon = gps.location.lng();
+      Serial.println("[GPS] FIX OK");
     } else {
-      Serial.println("LAT:UNKNOWN");
-      Serial.println("LON:UNKNOWN");
+      Serial.println("[GPS] FIX FAILED");
     }
 
-    // -------- IMPACT TYPE --------
-    Serial.print("IMPACT_TYPE:");
-    if (frontImpact) Serial.println("FRONTAL");
-    else if (rearImpact) Serial.println("REAR_OR_SIDE");
-    else Serial.println("ROLLOVER");
+    String impactType = "ROLLOVER";
+    if (frontImpact) impactType = "FRONTAL";
+    else if (rearImpact) impactType = "REAR_OR_SIDE";
 
-    Serial.println("END_PACKET");
-    Serial.println("---------------------------------");
+    sendAccidentToServer(lat, lon, impactType);
+
+    Serial.println("[SYSTEM] Data Sent to Server");
   }
 
   delay(500);

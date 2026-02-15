@@ -15,9 +15,10 @@ const EmergencyModule: React.FC<EmergencyModuleProps> = ({ onOpenResponderPortal
   const [log, setLog] = useState<string[]>([]);
   const [holdProgress, setHoldProgress] = useState(0);
   const [currentEvent, setCurrentEvent] = useState<EmergencyEvent | null>(null);
+  const [verifiedResponders, setVerifiedResponders] = useState<any>(null);
   const holdTimerRef = useRef<number | null>(null);
 
-  const addLog = (msg: string) => setLog(prev => [msg, ...prev].slice(0, 5));
+  const addLog = (msg: string) => setLog(prev => [msg, ...prev].slice(0, 8));
 
   const startEmergency = () => {
     setStatus(EmergencyStatus.REPORTING);
@@ -32,7 +33,7 @@ const EmergencyModule: React.FC<EmergencyModuleProps> = ({ onOpenResponderPortal
       },
       (err) => {
         addLog("WARN: GPS SIGNAL WEAK. USING LAST KNOWN POSITION.");
-        setTimeout(() => processDispatch(28.6139, 77.2090), 1000);
+        setTimeout(() => processDispatch(37.7749, -122.4194), 1000);
       },
       { enableHighAccuracy: true, timeout: 5000 }
     );
@@ -44,7 +45,9 @@ const EmergencyModule: React.FC<EmergencyModuleProps> = ({ onOpenResponderPortal
     addLog("UPLINK: CONTACTING TWIN DISPATCH NODES...");
 
     try {
-      const facilities = await findNearestEmergencyServices(lat, lng);
+      // Step 1: AI Grounding for context
+      const aiFacilities = await findNearestEmergencyServices(lat, lng);
+      
       const event: EmergencyEvent = {
         id: `LG-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
         type: 'CRITICAL ACCIDENT',
@@ -52,22 +55,43 @@ const EmergencyModule: React.FC<EmergencyModuleProps> = ({ onOpenResponderPortal
         timestamp: new Date().toLocaleString(),
         status: EmergencyStatus.REPORTING,
         severity: 'Severe',
-        nearestFacilities: facilities
+        nearestFacilities: aiFacilities
       };
       
       setCurrentEvent(event);
+
+      // Step 2: Trigger Backend Geospatial Decision Module
       const response = await triggerAutomatedEmergencyCommunications({
         event_type: 'CRITICAL_ACCIDENT',
         latitude: lat,
         longitude: lng,
         timestamp: event.timestamp,
         severity: 'SEVERE',
-        source: 'LIFEGUARD_MOBILE_v2'
+        source: 'LIFEGUARD_PRO_v3'
       });
       
+      if (response.responders) {
+        setVerifiedResponders(response.responders);
+        addLog("GEOSPATIAL: HAVERSINE CALCULATION COMPLETE.");
+        addLog(`ASSIGNED: ${response.responders.hospital.name} (${response.responders.hospital.distance.toFixed(2)}km)`);
+      }
+
       addLog(`SUCCESS: ${response.broadcast_count} SIGNALS TRANSMITTED`);
       setDispatchPhase('DISPATCHED');
-      setTimeout(() => onOpenResponderPortal(event), 1500);
+      
+      // Pass the verified responders back to the main event
+      const updatedEvent = {
+        ...event,
+        nearestFacilities: response.responders ? Object.values(response.responders).map((r: any) => ({
+          name: r.name,
+          address: r.id,
+          location: { lat: r.lat, lng: r.lng },
+          type: r.type,
+          uri: r.maps_link
+        })) : aiFacilities
+      };
+
+      setTimeout(() => onOpenResponderPortal(updatedEvent), 2500);
     } catch (e) {
       addLog("ERROR: DISPATCH HUB UNREACHABLE.");
       setTimeout(() => setStatus(EmergencyStatus.IDLE), 3000);
@@ -104,7 +128,6 @@ const EmergencyModule: React.FC<EmergencyModuleProps> = ({ onOpenResponderPortal
             <div className="h-[1px] w-12 bg-red-600/40 mx-auto mt-2"></div>
           </header>
 
-          {/* Centered Trigger Button */}
           <div className="relative flex flex-col items-center justify-center">
             <svg className="absolute w-[340px] h-[340px] -rotate-90">
               <circle cx="170" cy="170" r="150" fill="transparent" stroke="rgba(255,255,255,0.03)" strokeWidth="2" />
@@ -122,7 +145,7 @@ const EmergencyModule: React.FC<EmergencyModuleProps> = ({ onOpenResponderPortal
               className={`w-64 h-64 rounded-full flex flex-col items-center justify-center border-2 border-red-600/20 bg-slate-950 shadow-[0_0_60px_rgba(220,38,38,0.1)] transition-transform active:scale-95 z-10`}
             >
               <div className={`w-24 h-24 rounded-3xl mb-6 flex items-center justify-center border border-red-500/30 transition-all ${holdProgress > 0 ? 'bg-red-600 shadow-[0_0_40px_rgba(220,38,38,0.4)]' : 'bg-red-600/10'}`}>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-red-500 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
@@ -151,9 +174,9 @@ const EmergencyModule: React.FC<EmergencyModuleProps> = ({ onOpenResponderPortal
           <div className="bg-slate-900/90 p-6 rounded-3xl border border-white/5">
              <div className="flex justify-between items-center mb-4">
                <span className="text-white text-lg font-black italic">DISPATCH CONSOLE</span>
-               <span className="bg-blue-600/20 text-blue-400 text-[9px] px-3 py-1 rounded-full font-black uppercase">{dispatchPhase}</span>
+               <span className="bg-blue-600/20 text-blue-400 text-[9px] px-3 py-1 rounded-full font-black uppercase tracking-widest">{dispatchPhase}</span>
              </div>
-             <div className="space-y-2 h-32 overflow-hidden font-mono text-[10px]">
+             <div className="space-y-2 h-40 overflow-hidden font-mono text-[10px]">
                 {log.map((m, i) => (
                   <div key={i} className={`flex gap-3 ${i === 0 ? 'text-blue-400' : 'text-slate-500'}`}>
                     <span>[{new Date().toLocaleTimeString()}]</span>
@@ -161,9 +184,29 @@ const EmergencyModule: React.FC<EmergencyModuleProps> = ({ onOpenResponderPortal
                   </div>
                 ))}
              </div>
+             
+             {verifiedResponders && (
+               <div className="mt-4 pt-4 border-t border-white/5 grid grid-cols-3 gap-2">
+                 {Object.entries(verifiedResponders).map(([key, val]: any) => (
+                   <div key={key} className="bg-slate-950 p-2 rounded-xl border border-white/5">
+                     <p className="text-[7px] text-slate-500 font-black uppercase">{key}</p>
+                     <p className="text-[8px] text-white font-black truncate">{val.name}</p>
+                     <p className="text-[7px] text-blue-400">{val.distance.toFixed(2)}km</p>
+                   </div>
+                 ))}
+               </div>
+             )}
           </div>
           <div className="flex-1 rounded-[2.5rem] overflow-hidden border border-white/5 bg-slate-950">
-             {userLoc && <LiveTrackingMap accidentLocation={userLoc} responderLocation={userLoc} isTracking={false} staticView={true} facilities={currentEvent?.nearestFacilities} />}
+             {userLoc && (
+              <LiveTrackingMap 
+                accidentLocation={userLoc} 
+                responderLocation={userLoc} 
+                isTracking={false} 
+                staticView={true} 
+                facilities={currentEvent?.nearestFacilities} 
+              />
+             )}
           </div>
         </div>
       )}

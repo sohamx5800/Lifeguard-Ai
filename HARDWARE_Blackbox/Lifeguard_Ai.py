@@ -3,34 +3,18 @@ import time
 import pyttsx3
 import speech_recognition as sr
 from datetime import datetime
-import os
 import cv2
-from twilio.rest import Client
 
-# ================= CONFIG =================
+
 SERIAL_PORT = "COM7"
 BAUD_RATE = 9600
 
 CAMERA_INDEX = 0
-PASSENGER_LOCK_TIME = 3        # seconds to lock passenger count
-MOVEMENT_MONITOR_TIME = 10     # seconds to monitor movement
-MOVEMENT_THRESHOLD = 5000      # pixel change threshold
+PASSENGER_LOCK_TIME = 3
+MOVEMENT_MONITOR_TIME = 10
+MOVEMENT_THRESHOLD = 5000
 
-TWILIO_ENABLED = True
 
-EMERGENCY_CONTACTS = [
-    "+918741849945",  # Police
-    "+918101072176",  # Ambulance
-    "+917478753070"   # Hospital
-]
-# =========================================
-
-# -------- ENV VARIABLES (Twilio) --------
-ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
-AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
-FROM_NUMBER = os.getenv("TWILIO_PHONE_NUMBER")
-
-twilio_client = Client(ACCOUNT_SID, AUTH_TOKEN) if TWILIO_ENABLED else None
 
 # -------- Voice Engine --------
 engine = pyttsx3.init()
@@ -38,20 +22,17 @@ engine.setProperty('rate', 175)
 
 recognizer = sr.Recognizer()
 
-# -------- Serial --------
 ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
 time.sleep(2)
 ser.reset_input_buffer()
 
-# -------- Camera & Vision --------
 cap = cv2.VideoCapture(CAMERA_INDEX)
 face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 
 print("\n===================================")
-print(" LIFEGUARD AI BACKEND READY ")
+print(" LIFEGUARD AI MONITOR MODULE READY ")
 print("===================================\n")
 
-# ================= UTILITIES =================
 def speak(text):
     print("[AI]:", text)
     engine.say(text)
@@ -66,46 +47,6 @@ def listen_response(timeout=10):
         except:
             return None
 
-def send_alerts(data):
-    msg = f"""
-🚨 LIFEGUARD AI ALERT 🚨
-
-Impact: {data['impact']}
-Passengers Detected: {data['passengers']}
-Time: {data['timestamp']}
-
-Live Location:
-https://maps.google.com/?q={data['latitude']},{data['longitude']}
-"""
-
-    if TWILIO_ENABLED:
-        for number in EMERGENCY_CONTACTS:
-            # SMS
-            twilio_client.messages.create(
-                body=msg,
-                from_=FROM_NUMBER,
-                to=number
-            )
-
-            # Voice Call
-            twilio_client.calls.create(
-                to=number,
-                from_=FROM_NUMBER,
-                twiml=f"""
-                <Response>
-                    <Say voice="alice">
-                        Emergency alert from Lifeguard AI.
-                        A vehicle accident has been detected.
-                        Impact type {data['impact']}.
-                        {data['passengers']} passengers detected.
-                        Location details have been sent by message.
-                        Please respond immediately.
-                    </Say>
-                </Response>
-                """
-            )
-
-# ================= MAIN LOOP =================
 while True:
 
     if ser.in_waiting:
@@ -161,7 +102,7 @@ while True:
 
                 cv2.putText(
                     frame,
-                    f"Locking Passengers: {passenger_count_locked}",
+                    f"Passengers: {passenger_count_locked}",
                     (20, 40),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     1,
@@ -204,7 +145,7 @@ while True:
 
                 cv2.putText(
                     frame,
-                    f"Passengers (Locked): {passenger_count_locked}",
+                    f"Passengers: {passenger_count_locked}",
                     (20, 40),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     1,
@@ -229,7 +170,7 @@ while True:
                     break
 
             # ==================================================
-            # FINAL DECISION
+            # FINAL DECISION (AI Only)
             # ==================================================
             if passenger_count_locked > 0 and movement_detected:
                 speak(f"{passenger_count_locked} passengers detected. Do you need medical assistance?")
@@ -237,14 +178,12 @@ while True:
                 print("Passenger Response:", response)
 
                 if response is None or "yes" in response or "help" in response:
-                    speak("Emergency confirmed. Sending help now.")
-                    send_alerts(accident_data)
+                    speak("Emergency confirmed. Help is already being dispatched.")
                 else:
-                    speak("Okay. Monitoring continues. Stay safe.")
+                    speak("Okay. Monitoring continues. Stay calm.")
 
             else:
-                speak("No passenger movement detected. Auto emergency activated.")
-                send_alerts(accident_data)
+                speak("No passenger movement detected. Emergency services have been notified automatically.")
 
     time.sleep(0.1)
 
