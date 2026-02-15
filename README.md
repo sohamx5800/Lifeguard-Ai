@@ -137,3 +137,21 @@ Instead:
     1.Open Arduino IDE
     2.Select ESP8266 board
     3.Upload firmware.ino
+
+
+## Run AI Edge Layer: 
+    cd HARDWARE_Blackbox
+    pip install -r requirements.txt
+    python Lifeguard_Ai.py
+
+
+## Run Root Server: 
+    cd Lifeguard_Root_Server
+    pip install -r requirements.txt
+    python run.py
+
+## Set Environment Variables.. Open cmd on windows and paste these with your actual credentials:
+    set TWILIO_ACCOUNT_SID=your_sid
+    set TWILIO_AUTH_TOKEN=your_token
+    set TWILIO_FROM_NUMBER=your_number
+    
