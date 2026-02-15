@@ -123,9 +123,9 @@ Instead:
     
 ## Haversine Algorithm (Nearest Service Detection):
   
-    <img width="1600" height="646" alt="image" src="https://github.com/user-attachments/assets/183bac56-90f4-46d7-819c-935500bc0994" />
-    <img width="1600" height="781" alt="image" src="https://github.com/user-attachments/assets/5909bf91-5589-431d-8f74-17adf9a8953a" />
-    <img width="1600" height="609" alt="image" src="https://github.com/user-attachments/assets/a651affb-05b3-4ba2-9366-c833a687e79f" />
+<img width="1600" height="646" alt="image" src="https://github.com/user-attachments/assets/183bac56-90f4-46d7-819c-935500bc0994" />
+<img width="1600" height="781" alt="image" src="https://github.com/user-attachments/assets/5909bf91-5589-431d-8f74-17adf9a8953a" />
+<img width="1600" height="609" alt="image" src="https://github.com/user-attachments/assets/a651affb-05b3-4ba2-9366-c833a687e79f" />
 
     a = sin²(Δφ/2) + cos(φ1) ⋅ cos(φ2) ⋅ sin²(Δλ/2)
     c = 2 ⋅ atan2(√a, √(1−a))
