@@ -1,68 +1,133 @@
 # 🚨 Lifeguard AI
 ## Intelligent Accident Detection & Autonomous Emergency Response Platform
 
-Lifeguard AI is a full-stack, production-ready accident detection and emergency automation system that combines vehicle-embedded hardware, AI-based passenger monitoring, GSM communication, and a scalable backend microservice architecture.
-
-It is designed to eliminate emergency response delays during the critical first minutes after a road accident.
-
----
-
-# 🌍 The Problem
-
-In road accidents, the most critical factor is **time**.
-
-Victims often:
-- Lose consciousness
-- Cannot reach their phone
-- Cannot manually call emergency services
-- Are in remote locations
-
-Even a few minutes of delay can determine life or death.
+Lifeguard AI is a full-stack intelligent accident response ecosystem that integrates embedded vehicle hardware, computer vision, AI-driven passenger monitoring, cloud communication infrastructure, and emergency service automation.
+The system is designed to detect accidents automatically, analyze passenger conditions in real time, and immediately dispatch emergency responders without requiring any manual action from the passengers.
+The primary objective is to reduce emergency response time during the Golden Hour, potentially saving thousands of lives.
 
 ---
 
-# 💡 The Solution — Lifeguard AI
+## 🌍 The Problem
 
-Lifeguard AI automatically:
+Every year millions of road accidents occur worldwide.
+A significant percentage of fatalities happen not because injuries are immediately fatal, but because:
+Victims lose consciousness
+Nobody nearby reports the accident
+Emergency services are delayed
+Victims cannot call for help
+Accidents occur in remote areas
+Medical research shows that 30–40% of accident deaths could be prevented if medical assistance arrived faster.
+This critical time window is known as the Golden Hour.
+Lifeguard AI directly addresses this challenge.
 
-1. Detects vehicle impact
-2. Captures live GPS location
-3. Detects passengers & movement
-4. Makes intelligent emergency decisions
-5. Finds nearest hospital using Haversine algorithm
-6. Sends SMS + AI voice call automatically
 
+## 💡 The Lifeguard AI Solution
+Lifeguard AI introduces an autonomous accident response system that:
+Detects vehicle crashes automatically
+Monitors passenger condition using AI
+Captures exact GPS coordinates
+Transmits accident data to cloud infrastructure
+Finds the nearest emergency services
+Automatically sends SMS alerts and AI voice calls
+Provides real-time tracking through a dashboard and mobile application
+The entire process happens within seconds after an accident occurs.
 
-## Complete System Flow
-    Vehicle Impact
-    ↓
-    ESP8266 Detects Accident
-    ↓
+## ⚙️ Complete System Workflow
+    Vehicle Crash Occurs
+            │
+            ▼
+    Black Box Detects Impact
+            │
+            ▼
     GPS Coordinates Captured
-    ↓
-    Passenger AI Monitoring
-    ↓
-    Accident Data Sent via GSM
-    ↓
-    Server Authenticates Vehicle
-    ↓
-    Haversine Finds Nearest Service
-    ↓
-    Database Retrieves Official Contact
-    ↓
-    SMS + AI Voice Call Triggered
-    ↓
-    Emergency Services Respond
+            │
+            ▼
+    AI Passenger Monitoring
+    (Face + Motion + Eye Detection)
+            │
+            ▼
+    Accident Data Packaged as JSON
+            │
+            ▼
+    MQTT Cloud Broker (Bridge Server)
+            │
+            ▼
+    Root Server Processes Event
+            │
+            ▼
+    Haversine Algorithm Calculates
+    Nearest Emergency Services
+            │
+            ▼
+    Twilio API Triggers
+    SMS + Voice Call Alerts
+            │
+            ▼
+    Emergency Response Dispatched
+
 
 
 All without requiring manual intervention.
 
 ---
 
-# 🏗 System Architecture
+## 🏗 System Architecture
+        Lifeguard AI uses a distributed multi-layer architecture.
+    ┌─────────────────────────────────────────────┐
+    │           VEHICLE BLACK BOX (EDGE AI)       │
+    │                                             │
+    │  MPU6050  GPS  Camera  Impact Sensors      │
+    │        │        │         │                │
+    │        └────────┼─────────┘                │
+    │                 ▼                          │
+    │         Passenger AI Monitoring            │
+    │        (Face + Motion + Eye Detection)     │
+    │                 ▼                          │
+    │        Accident Data JSON Packet           │
+    └─────────────────────────────────────────────┘
+                         │
+                         ▼
+    ┌─────────────────────────────────────────────┐
+    │            MQTT CLOUD BROKER                │
+    │          (HiveMQ Communication Bridge)      │
+    └─────────────────────────────────────────────┘
+                         │
+                         ▼
+    ┌─────────────────────────────────────────────┐
+    │            ROOT SERVER (FASTAPI)            │
+    │                                             │
+    │  Authentication                             │
+    │  Accident Processing                        │
+    │  Haversine Distance Engine                  │
+    │  Emergency Service Database                 │
+    │  Twilio Alert Dispatcher                    │
+    └─────────────────────────────────────────────┘
+                         │
+                         ▼
+    ┌─────────────────────────────────────────────┐
+    │            STREAMLIT COMMAND DASHBOARD      │
+    │                                             │
+    │  Accident Monitoring                        │
+    │  Live Event Visualization                   │
+    │  Emergency Dispatch Status                  │
+    │  Analytics & Statistics                     │
+    └─────────────────────────────────────────────┘
+                         │
+                         ▼
+    ┌─────────────────────────────────────────────┐
+    │             MOBILE APPLICATION              │
+    │                                             │
+    │  Emergency Dashboard                        │
+    │  Live Accident Map                          │
+    │  Medical AI Assistant                       │
+    │  Prescription Generator                     │
+    │  Pharmacy Ordering                          │
+    │  Responder Portal                           │
+    └─────────────────────────────────────────────┘
 
 Lifeguard AI consists of three primary layers: 
----
+--- ![3 layer ](https://github.com/user-attachments/assets/4cbd2b75-3dcd-4aff-99d6-5e6db61d9a42)
+
 
 # 🚗 1️⃣ Vehicle Black Box (Hardware Layer)
 
@@ -79,47 +144,93 @@ Lifeguard AI consists of three primary layers:
 
 ## 🚦 Accident Detection Logic
 
-Accident is triggered if:
+    The system detects accidents using sensor fusion techniques.
+    
+    An accident is triggered if:
+    
+    Front impact sensor is activated
+    
+    Rear impact sensor is activated
+    
+    Acceleration magnitude exceeds threshold (2.2G)
+    
+    Rollover detected using MPU6050 gyroscope
+    
+    Acceleration magnitude formula:
+    
+    |a| = √(ax² + ay² + az²)
+    
+## 🤖 AI Passenger Monitoring
+    
+    Once a crash is detected, the onboard AI performs passenger condition analysis.
+    
+    Face Detection
+    
+    Counts the number of passengers inside the vehicle.
+    
+    Motion Detection
+    
+    Determines whether passengers are moving.
+    
+    Eye Activity Detection
+    
+    Detects whether passengers are conscious.
+    
+    Voice Interaction
+    
+    The AI assistant asks:
+    
+    "Do you need medical assistance?"
+    
+    Decision scenarios:
+    
+    Condition
+    
+    System Action
+    
+    Movement + response
+    
+    Emergency triggered
+    
+    Movement + no response
+    
+    Emergency triggered
+    
+    No movement
+    
+    Immediate emergency dispatch
+    
+## 📡 MQTT Communication Bridge
 
-- Front impact button pressed
-- Rear impact button pressed
-- Acceleration magnitude > threshold (2.2g)
-
-Acceleration magnitude:
----
-
-## 📍 GPS Acquisition
-
-After impact detection:
-
-- Wait up to 5 seconds for valid GPS fix
-- Capture:
-  - Latitude
-  - Longitude
-  - Impact type
-
----
-
-## 📡 GSM Data Transmission
-
-The black box does NOT use WiFi.
-
-Instead:
-- GSM module with SIM card
-- Sends JSON data over mobile data network
-- Posts to company server API endpoint
-
+    Lifeguard AI uses the MQTT protocol as a communication bridge.
+    
+    Advantages:
+    
+    Lightweight communication
+    
+    Real-time event streaming
+    
+    Secure device connectivity
+    
+    Scalable IoT architecture
+    
+    Accident events are published to:
+    
+    MQTT Topic:
+    lifeguard/accidents
+    
     Example payload:
     
-    ```json
-    {
-      "car_id": "car0xc1",
-      "api_key": "secure_auth_key",
-      "latitude": 26.1234,
-      "longitude": 89.4567,
-      "impact": "FRONTAL",
-      "passengers": 2
-    }
+        {
+          "car_id": "car0xc1",
+          "auth_key": "secure_key",
+          "timestamp": "2026-03-08T02:06:46",
+          "lat": 26.123456,
+          "lon": 89.456789,
+          "impact": "FRONTAL",
+          "passengers": 2
+        }
+
 
 ## App Features:
     1.Emergency dashboard
@@ -130,9 +241,24 @@ Instead:
     6.Responder portal
 
 
+## 🧮 Emergency Service Detection (Haversine Algorithm)
 
+    The system finds the nearest responders using the Haversine distance formula.
     
-## Haversine Algorithm (Nearest Service Detection):
+    a = sin²(Δφ/2) + cos(φ1) ⋅ cos(φ2) ⋅ sin²(Δλ/2)
+    c = 2 ⋅ atan2(√a, √(1−a))
+    d = R ⋅ c
+    
+    Where:
+    
+    φ = latitude
+    
+    λ = longitude
+    
+    R = Earth radius (6371 km)
+    
+    The system searches for responders within a 15 km emergency radius.
+
   
 <img width="1600" height="646" alt="image" src="https://github.com/user-attachments/assets/183bac56-90f4-46d7-819c-935500bc0994" />
 <img width="1600" height="781" alt="image" src="https://github.com/user-attachments/assets/5909bf91-5589-431d-8f74-17adf9a8953a" />
@@ -153,13 +279,26 @@ Instead:
 ## Run AI Edge Layer: 
     cd HARDWARE_Blackbox
     pip install -r requirements.txt
-    python Lifeguard_Ai.py
+    python gateway.py
 
 
-## Run Root Server: 
-    cd Lifeguard_Root_Server
-    pip install -r requirements.txt
-    python run.py
+## ⚙️ Installation & Setup
+    1️⃣ Upload Firmware
+        Open Arduino IDE
+        Select ESP8266 board
+        Upload firmware
+    2️⃣ Run Edge AI System
+        cd HARDWARE_Blackbox
+        pip install -r requirements.txt
+        python gateway.py
+    3️⃣ Run Root Server
+        cd Lifeguard_Root_Server
+        pip install -r requirements.txt
+        python run.py
+    4️⃣ Run API Server
+        uvicorn api_server:app --reload
+    5️⃣ Run Dashboard
+        streamlit run dashboard/dashboard.py
 
 ## Set Environment Variables.. Open cmd on windows and paste these with your actual credentials:
     set TWILIO_ACCOUNT_SID=your_sid
