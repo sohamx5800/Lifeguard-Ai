@@ -1,25 +1,50 @@
-from flask import Blueprint, request, jsonify
-from schemas.accident_schema import AccidentSchema
-from core.auth import authenticate_device
-from services.accident_service import process_accident
+from fastapi import APIRouter
+from db.models import get_all_accidents
 
-accident_bp = Blueprint("accident", __name__)
+router = APIRouter(
+    prefix="/api",
+    tags=["Accidents"]
+)
 
-@accident_bp.route("/api/accident", methods=["POST"])
-def receive_accident():
-    try:
-        data = AccidentSchema(**request.json)
 
-        # Authenticate black box
-        if not authenticate_device(data.car_id, data.auth_key):
-            return jsonify({"error": "Unauthorized device"}), 401
+# ---------------------------------------------------
+# Get All Accident Events
+# ---------------------------------------------------
+@router.get("/accidents")
+def get_accidents():
 
-        nearest = process_accident(data)
+    rows = get_all_accidents()
 
-        return jsonify({
-            "status": "alert_processed",
-            "service_contacted": nearest["name"] if nearest else None
+    accidents = []
+
+    for r in rows:
+
+        accidents.append({
+            "id": r[0],
+            "car_id": r[1],
+            "latitude": r[2],
+            "longitude": r[3],
+            "impact": r[4],
+            "passengers": r[5],
+            "severity": r[6],
+            "timestamp": r[7],
+            "status": r[8],
+            "map_link": f"https://maps.google.com/?q={r[2]},{r[3]}"
         })
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
+    return {
+        "total_accidents": len(accidents),
+        "data": accidents
+    }
+
+
+# ---------------------------------------------------
+# Health Check API
+# ---------------------------------------------------
+@router.get("/health")
+def health():
+
+    return {
+        "server": "Lifeguard Root Server",
+        "status": "running"
+    }

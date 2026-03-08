@@ -1,16 +1,52 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime
-from datetime import datetime
-from db.database import Base
+import sqlite3
 
-class AccidentRecord(Base):
-    __tablename__ = "accidents"
+conn = sqlite3.connect("lifeguard.db", check_same_thread=False)
+cursor = conn.cursor()
 
-    id = Column(Integer, primary_key=True, index=True)
-    car_id = Column(String, nullable=False)
-    latitude = Column(Float, nullable=False)
-    longitude = Column(Float, nullable=False)
-    impact_type = Column(String, nullable=False)
-    passengers = Column(Integer, nullable=True)
-    service_name = Column(String, nullable=False)
-    timestamp = Column(DateTime, default=datetime.utcnow)
-    status = Column(String, default="PROCESSED")
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS accidents(
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+car_id TEXT,
+lat REAL,
+lon REAL,
+impact TEXT,
+passengers INTEGER,
+severity TEXT,
+timestamp TEXT,
+status TEXT
+)
+""")
+
+conn.commit()
+
+
+def log_accident(data):
+
+    cursor.execute(
+        """
+        INSERT INTO accidents
+        (car_id,lat,lon,impact,passengers,severity,timestamp,status)
+        VALUES (?,?,?,?,?,?,?,?)
+        """,
+        (
+            data["car_id"],
+            data["lat"],
+            data["lon"],
+            data["impact"],
+            data["passengers"],
+            data["severity"],
+            data["timestamp"],
+            "DISPATCHED"
+        )
+    )
+
+    conn.commit()
+
+
+def get_all_accidents():
+
+    cursor.execute("SELECT * FROM accidents ORDER BY id DESC")
+
+    rows = cursor.fetchall()
+
+    return rows

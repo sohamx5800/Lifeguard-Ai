@@ -1,0 +1,8 @@
+{
+  "name": "LifeGuard AI: Emergency & Health Ecosystem",
+  "description": "An integrated AI-driven emergency response and healthcare support platform featuring autonomous accident reporting, real-time dispatch tracking, and intelligent medical assistance.",
+  "requestFramePermissions": [
+    "microphone",
+    "geolocation"
+  ]
+}

@@ -141,7 +141,7 @@ const HealthModule: React.FC = () => {
                           <p className="text-xs font-black text-white uppercase">{med.name}</p>
                           <p className="text-[9px] text-slate-500 font-bold uppercase mt-1">{med.dosage} • {med.purpose}</p>
                         </div>
-                        <p className="text-xs font-black text-blue-400">₹{med.price}</p>
+                        <p className="text-xs font-black text-blue-400">₹{isNaN(med.price) ? '--' : med.price}</p>
                       </div>
                     ))}
                  </div>

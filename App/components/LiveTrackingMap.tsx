@@ -9,9 +9,10 @@ interface LiveTrackingMapProps {
   isTracking: boolean;
   staticView?: boolean;
   facilities?: EmergencyFacility[];
+  nearestService?: any;
 }
 
-const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({ accidentLocation, responderLocation, isTracking, staticView, facilities }) => {
+const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({ accidentLocation, responderLocation, isTracking, staticView, facilities, nearestService }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<{ [key: string]: any }>({});
@@ -85,17 +86,29 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({ accidentLocation, res
     facilities.forEach((f, idx) => {
       const key = `facility-${idx}`;
       if (!markersRef.current[key]) {
+        const isNearest = nearestService && f.name === nearestService.name;
         const icon = L.divIcon({
           className: 'facility-icon',
-          html: `<div class="bg-slate-900 border border-white/20 p-2 rounded-full shadow-2xl flex items-center justify-center text-sm ring-2 ring-white/5 backdrop-blur-md">${f.type === 'Hospital' ? '🏥' : f.type === 'Police' ? '🚓' : '🚑'}</div>`,
+          html: `<div class="bg-slate-900 border ${isNearest ? 'border-green-500 ring-4 ring-green-500/20' : 'border-white/20'} p-2 rounded-full shadow-2xl flex items-center justify-center text-sm ring-2 ring-white/5 backdrop-blur-md transition-all">
+            ${f.type === 'Hospital' ? '🏥' : f.type === 'Police' ? '🚓' : '🚑'}
+          </div>`,
           iconSize: [34, 34],
           iconAnchor: [17, 17]
         });
+        
+        const distance = nearestService && f.name === nearestService.name ? nearestService.distance : null;
+        
         markersRef.current[key] = L.marker([f.location.lat, f.location.lng], { icon }).addTo(mapRef.current)
-          .bindPopup(`<div class="p-2 bg-slate-900 text-white rounded-lg"><b class="text-[9px] uppercase tracking-widest text-blue-400">${f.name}</b><p class="text-[8px] text-slate-400 font-bold uppercase mt-1">${f.type} Unit Identified</p></div>`);
+          .bindPopup(`
+            <div class="p-2 bg-slate-900 text-white rounded-lg">
+              <b class="text-[9px] uppercase tracking-widest ${isNearest ? 'text-green-400' : 'text-blue-400'}">${f.name}</b>
+              <p class="text-[8px] text-slate-400 font-bold uppercase mt-1">${f.type} Unit Identified</p>
+              ${distance ? `<p class="text-[8px] text-green-400 font-black mt-1">NEAREST: ${distance.toFixed(2)} KM</p>` : ''}
+            </div>
+          `);
       }
     });
-  }, [facilities]);
+  }, [facilities, nearestService]);
 
   useEffect(() => {
     if (mapRef.current && isTracking && markersRef.current.responder) {
@@ -158,7 +171,9 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({ accidentLocation, res
           <div className="bg-slate-950/95 backdrop-blur-2xl px-6 py-5 rounded-[2rem] border border-white/10 shadow-2xl pointer-events-auto">
             <p className="text-[9px] font-black text-blue-400 uppercase tracking-[0.4em] mb-2">ETA Analysis</p>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-black text-white italic">{Math.max(1, Math.round(parseFloat(distance) * 2.5))}</span>
+              <span className="text-3xl font-black text-white italic">
+                {isNaN(parseFloat(distance)) ? '--' : Math.max(1, Math.round(parseFloat(distance) * 2.5))}
+              </span>
               <span className="text-[12px] font-black text-slate-500 uppercase tracking-widest">Mins</span>
             </div>
           </div>

@@ -10,6 +10,9 @@ interface EmergencyPayload {
   timestamp: string;
   severity: string;
   source: string;
+  car_id: string;
+  impact_type: string;
+  passenger_count?: number;
 }
 
 export const triggerAutomatedEmergencyCommunications = async (payload: EmergencyPayload) => {

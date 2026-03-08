@@ -29,6 +29,12 @@ export interface EmergencyEvent {
   status: EmergencyStatus;
   severity: 'Minor' | 'Moderate' | 'Severe';
   nearestFacilities?: EmergencyFacility[];
+  car_id?: string;
+  impact_type?: string;
+  passenger_count?: number;
+  nearestService?: any;
+  sms_status?: string;
+  call_status?: string;
 }
 
 export interface Medicine {

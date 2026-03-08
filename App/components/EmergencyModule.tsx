@@ -10,25 +10,32 @@ interface EmergencyModuleProps {
 
 const EmergencyModule: React.FC<EmergencyModuleProps> = ({ onOpenResponderPortal }) => {
   const [status, setStatus] = useState<EmergencyStatus>(EmergencyStatus.IDLE);
-  const [dispatchPhase, setDispatchPhase] = useState<'IDLE' | 'SCANNING' | 'UPLINKING' | 'DISPATCHED'>('IDLE');
   const [userLoc, setUserLoc] = useState<Location | null>(null);
   const [log, setLog] = useState<string[]>([]);
   const [holdProgress, setHoldProgress] = useState(0);
   const [currentEvent, setCurrentEvent] = useState<EmergencyEvent | null>(null);
   const [verifiedResponders, setVerifiedResponders] = useState<any>(null);
   const holdTimerRef = useRef<number | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<Location | null>(null);
+
+  useEffect(() => {
+    // Initial location fetch for display
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setCurrentLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => console.warn("Initial location fetch failed"),
+      { enableHighAccuracy: true, timeout: 5000 }
+    );
+  }, []);
 
   const addLog = (msg: string) => setLog(prev => [msg, ...prev].slice(0, 8));
 
   const startEmergency = () => {
     setStatus(EmergencyStatus.REPORTING);
-    setDispatchPhase('SCANNING');
-    addLog("INIT: TRIANGULATING SATELLITE POSITION...");
+    addLog("INIT: EMERGENCY PROTOCOL ACTIVATED");
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude: lat, longitude: lng } = pos.coords;
-        addLog(`FIX: COORDS ACQUIRED [${lat.toFixed(4)}, ${lng.toFixed(4)}]`);
         processDispatch(lat, lng);
       },
       (err) => {
@@ -41,8 +48,7 @@ const EmergencyModule: React.FC<EmergencyModuleProps> = ({ onOpenResponderPortal
 
   const processDispatch = async (lat: number, lng: number) => {
     setUserLoc({ lat, lng });
-    setDispatchPhase('UPLINKING');
-    addLog("UPLINK: CONTACTING TWIN DISPATCH NODES...");
+    addLog("UPLINK: DISPATCHING EMERGENCY SERVICES...");
 
     try {
       // Step 1: AI Grounding for context
@@ -55,46 +61,56 @@ const EmergencyModule: React.FC<EmergencyModuleProps> = ({ onOpenResponderPortal
         timestamp: new Date().toLocaleString(),
         status: EmergencyStatus.REPORTING,
         severity: 'Severe',
-        nearestFacilities: aiFacilities
+        nearestFacilities: aiFacilities,
+        car_id: 'BEE-ROBO-001',
+        impact_type: 'MANUAL_SOS',
+        passenger_count: 1
       };
       
       setCurrentEvent(event);
 
-      // Step 2: Trigger Backend Geospatial Decision Module
+      // Step 2: Trigger Backend Dispatch
       const response = await triggerAutomatedEmergencyCommunications({
         event_type: 'CRITICAL_ACCIDENT',
         latitude: lat,
         longitude: lng,
         timestamp: event.timestamp,
         severity: 'SEVERE',
-        source: 'LIFEGUARD_PRO_v3'
+        source: 'LIFEGUARD_MOBILE_v1',
+        car_id: event.car_id!,
+        impact_type: event.impact_type!,
+        passenger_count: event.passenger_count
       });
       
-      if (response.responders) {
+      if (response.status === 'success' || response.status === 'partial_success') {
         setVerifiedResponders(response.responders);
-        addLog("GEOSPATIAL: HAVERSINE CALCULATION COMPLETE.");
-        addLog(`ASSIGNED: ${response.responders.hospital.name} (${response.responders.hospital.distance.toFixed(2)}km)`);
+        addLog(`SMS: ${response.sms_status === 'simulated' ? 'SENT' : response.sms_status.toUpperCase()}`);
+        addLog(`CALL: ${response.call_status === 'simulated' ? 'INITIATED' : response.call_status.toUpperCase()}`);
+        
+        const updatedEvent: EmergencyEvent = {
+          ...event,
+          nearestService: response.nearestService,
+          sms_status: response.sms_status === 'simulated' ? 'sent' : response.sms_status,
+          call_status: response.call_status === 'simulated' ? 'initiated' : response.call_status,
+          status: EmergencyStatus.NOTIFIED,
+          nearestFacilities: response.responders ? Object.values(response.responders).map((r: any) => ({
+            name: r.name,
+            address: r.id,
+            location: { lat: r.lat, lng: r.lng },
+            type: r.type,
+            uri: r.maps_link
+          })) : aiFacilities
+        };
+        
+        setCurrentEvent(updatedEvent);
+        setStatus(EmergencyStatus.NOTIFIED);
+        addLog(`SUCCESS: DISPATCH PIPELINE ACTIVE`);
+      } else {
+        throw new Error(response.error || "Dispatch failed");
       }
-
-      addLog(`SUCCESS: ${response.broadcast_count} SIGNALS TRANSMITTED`);
-      setDispatchPhase('DISPATCHED');
-      
-      // Pass the verified responders back to the main event
-      const updatedEvent = {
-        ...event,
-        nearestFacilities: response.responders ? Object.values(response.responders).map((r: any) => ({
-          name: r.name,
-          address: r.id,
-          location: { lat: r.lat, lng: r.lng },
-          type: r.type,
-          uri: r.maps_link
-        })) : aiFacilities
-      };
-
-      setTimeout(() => onOpenResponderPortal(updatedEvent), 2500);
-    } catch (e) {
-      addLog("ERROR: DISPATCH HUB UNREACHABLE.");
-      setTimeout(() => setStatus(EmergencyStatus.IDLE), 3000);
+    } catch (e: any) {
+      addLog(`ERROR: ${e.message || "DISPATCH HUB UNREACHABLE"}`);
+      setTimeout(() => setStatus(EmergencyStatus.IDLE), 5000);
     }
   };
 
@@ -154,29 +170,74 @@ const EmergencyModule: React.FC<EmergencyModuleProps> = ({ onOpenResponderPortal
             </button>
           </div>
 
-          <div className="absolute bottom-12 grid grid-cols-3 gap-12 text-center">
-            <div className="flex flex-col items-center">
-              <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse shadow-[0_0_8px_#3b82f6]"></div>
-              <span className="text-[8px] font-black text-slate-500 uppercase mt-2">GPS LINK</span>
+          <div className="absolute bottom-12 w-full px-8 flex flex-col items-center">
+            {currentLocation && (
+              <div className="mb-8 bg-slate-900/50 backdrop-blur-md px-4 py-2 rounded-xl border border-white/5 flex items-center gap-3">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                <span className="text-[10px] font-mono text-slate-300">
+                  LOC: {currentLocation.lat.toFixed(4)}, {currentLocation.lng.toFixed(4)}
+                </span>
+              </div>
+            )}
+            
+            <div className="grid grid-cols-3 gap-12 text-center">
+              <div className="flex flex-col items-center">
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse shadow-[0_0_8px_#3b82f6]"></div>
+                <span className="text-[8px] font-black text-slate-500 uppercase mt-2">GPS LINK</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_#22c55e]"></div>
+                <span className="text-[8px] font-black text-slate-500 uppercase mt-2">SAT COMMS</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_#ef4444]"></div>
+                <span className="text-[8px] font-black text-slate-500 uppercase mt-2">AI CORE</span>
+              </div>
             </div>
-            <div className="flex flex-col items-center">
-              <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_#22c55e]"></div>
-              <span className="text-[8px] font-black text-slate-500 uppercase mt-2">SAT COMMS</span>
-            </div>
-            <div className="flex flex-col items-center">
-              <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_#ef4444]"></div>
-              <span className="text-[8px] font-black text-slate-500 uppercase mt-2">AI CORE</span>
+            <div className="mt-6 text-[8px] font-black text-slate-500/40 uppercase tracking-[0.4em] italic">
+              Emergency Response System Active
             </div>
           </div>
         </div>
       ) : (
         <div className="flex-1 flex flex-col p-6 space-y-4">
-          <div className="bg-slate-900/90 p-6 rounded-3xl border border-white/5">
+          <div className="bg-slate-900/90 p-6 rounded-3xl border border-white/5 shadow-2xl">
              <div className="flex justify-between items-center mb-4">
                <span className="text-white text-lg font-black italic">DISPATCH CONSOLE</span>
-               <span className="bg-blue-600/20 text-blue-400 text-[9px] px-3 py-1 rounded-full font-black uppercase tracking-widest">{dispatchPhase}</span>
+               <span className={`text-[9px] px-3 py-1 rounded-full font-black uppercase tracking-widest ${
+                 status === EmergencyStatus.NOTIFIED ? 'bg-green-600/20 text-green-400' : 'bg-blue-600/20 text-blue-400'
+               }`}>
+                 {status === EmergencyStatus.NOTIFIED ? 'DISPATCHED' : 'DISPATCHING'}
+               </span>
              </div>
-             <div className="space-y-2 h-40 overflow-hidden font-mono text-[10px]">
+             
+             {/* Status Panel */}
+             {currentEvent && (
+               <div className="mb-4 grid grid-cols-2 gap-3">
+                 <div className="bg-slate-950/50 p-3 rounded-2xl border border-white/5">
+                   <p className="text-[7px] text-slate-500 font-black uppercase mb-1">Incident Location</p>
+                   <p className="text-[9px] text-white font-mono">{currentEvent.location.lat.toFixed(4)}, {currentEvent.location.lng.toFixed(4)}</p>
+                 </div>
+                 <div className="bg-slate-950/50 p-3 rounded-2xl border border-white/5">
+                   <p className="text-[7px] text-slate-500 font-black uppercase mb-1">Nearest Service</p>
+                   <p className="text-[9px] text-white font-black truncate">{currentEvent.nearestService?.name || 'Calculating...'}</p>
+                 </div>
+                 <div className="bg-slate-950/50 p-3 rounded-2xl border border-white/5">
+                   <p className="text-[7px] text-slate-500 font-black uppercase mb-1">SMS Status</p>
+                   <p className={`text-[9px] font-black uppercase ${currentEvent.sms_status === 'sent' ? 'text-green-400' : 'text-yellow-400'}`}>
+                     {currentEvent.sms_status || 'Pending'}
+                   </p>
+                 </div>
+                 <div className="bg-slate-950/50 p-3 rounded-2xl border border-white/5">
+                   <p className="text-[7px] text-slate-500 font-black uppercase mb-1">Call Status</p>
+                   <p className={`text-[9px] font-black uppercase ${currentEvent.call_status === 'initiated' ? 'text-green-400' : 'text-yellow-400'}`}>
+                     {currentEvent.call_status || 'Pending'}
+                   </p>
+                 </div>
+               </div>
+             )}
+
+             <div className="space-y-2 h-32 overflow-hidden font-mono text-[10px] border-t border-white/5 pt-4">
                 {log.map((m, i) => (
                   <div key={i} className={`flex gap-3 ${i === 0 ? 'text-blue-400' : 'text-slate-500'}`}>
                     <span>[{new Date().toLocaleTimeString()}]</span>
@@ -185,16 +246,13 @@ const EmergencyModule: React.FC<EmergencyModuleProps> = ({ onOpenResponderPortal
                 ))}
              </div>
              
-             {verifiedResponders && (
-               <div className="mt-4 pt-4 border-t border-white/5 grid grid-cols-3 gap-2">
-                 {Object.entries(verifiedResponders).map(([key, val]: any) => (
-                   <div key={key} className="bg-slate-950 p-2 rounded-xl border border-white/5">
-                     <p className="text-[7px] text-slate-500 font-black uppercase">{key}</p>
-                     <p className="text-[8px] text-white font-black truncate">{val.name}</p>
-                     <p className="text-[7px] text-blue-400">{val.distance.toFixed(2)}km</p>
-                   </div>
-                 ))}
-               </div>
+             {status === EmergencyStatus.NOTIFIED && (
+               <button 
+                onClick={() => onOpenResponderPortal(currentEvent!)}
+                className="w-full mt-4 bg-red-600 hover:bg-red-700 text-white font-black py-3 rounded-2xl text-xs uppercase tracking-widest transition-all shadow-lg shadow-red-600/20"
+               >
+                 Open Responder Portal
+               </button>
              )}
           </div>
           <div className="flex-1 rounded-[2.5rem] overflow-hidden border border-white/5 bg-slate-950">
@@ -205,6 +263,7 @@ const EmergencyModule: React.FC<EmergencyModuleProps> = ({ onOpenResponderPortal
                 isTracking={false} 
                 staticView={true} 
                 facilities={currentEvent?.nearestFacilities} 
+                nearestService={currentEvent?.nearestService}
               />
              )}
           </div>

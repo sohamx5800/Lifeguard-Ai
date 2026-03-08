@@ -9,123 +9,28 @@ interface ResponderPortalProps {
 }
 
 const ResponderPortal: React.FC<ResponderPortalProps> = ({ event, onClose }) => {
-  const [isCalling, setIsCalling] = useState(false);
-  const [callAnswered, setCallAnswered] = useState(false);
   const [primaryResponder, setPrimaryResponder] = useState<EmergencyFacility | null>(null);
   const [responderPos, setResponderPos] = useState<Location>({ lat: 0, lng: 0 });
-  const audioContextRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
-    if (event.nearestFacilities && event.nearestFacilities.length > 0) {
+    if (event.nearestService) {
+      const service = {
+        name: event.nearestService.name,
+        address: event.nearestService.id,
+        location: { lat: event.nearestService.lat, lng: event.nearestService.lng },
+        type: event.nearestService.type as any
+      };
+      setPrimaryResponder(service);
+      setResponderPos(service.location);
+    } else if (event.nearestFacilities && event.nearestFacilities.length > 0) {
       const hospital = event.nearestFacilities.find(f => f.type === 'Hospital') || event.nearestFacilities[0];
       setPrimaryResponder(hospital);
       setResponderPos(hospital.location);
     }
-
-    const timer = setTimeout(() => {
-      setIsCalling(true);
-      setTimeout(() => handleAnswerCall(), 2500);
-    }, 1000);
-    return () => clearTimeout(timer);
   }, [event]);
-
-  const decodeBase64 = (base64: string) => {
-    const binaryString = atob(base64);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes;
-  };
-
-  const decodeAudioData = async (
-    data: Uint8Array,
-    ctx: AudioContext,
-    sampleRate: number,
-    numChannels: number,
-  ): Promise<AudioBuffer> => {
-    const dataInt16 = new Int16Array(data.buffer);
-    const frameCount = dataInt16.length / numChannels;
-    const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-
-    for (let channel = 0; channel < numChannels; channel++) {
-      const channelData = buffer.getChannelData(channel);
-      for (let i = 0; i < frameCount; i++) {
-        channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
-      }
-    }
-    return buffer;
-  };
-
-  const handleAnswerCall = async () => {
-    setCallAnswered(true);
-    const audioData = await generateEmergencySpeech({
-      type: event.type,
-      location: `${event.location.lat.toFixed(4)}, ${event.location.lng.toFixed(4)}`,
-      severity: event.severity,
-      facilityName: primaryResponder?.name
-    });
-
-    if (audioData) {
-      if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-      const ctx = audioContextRef.current;
-      
-      try {
-        const bytes = decodeBase64(audioData);
-        const buffer = await decodeAudioData(bytes, ctx, 24000, 1);
-        
-        const source = ctx.createBufferSource();
-        source.buffer = buffer;
-        source.connect(ctx.destination);
-        source.start();
-        source.onended = () => {
-          setTimeout(() => setIsCalling(false), 2000);
-        };
-      } catch (err) {
-        console.error("Critical: Failed to decode or play emergency dispatch audio.", err);
-        setIsCalling(false);
-      }
-    } else {
-      setTimeout(() => setIsCalling(false), 2000);
-    }
-  };
-
-  useEffect(() => {
-    if (!primaryResponder) return;
-    const interval = setInterval(() => {
-      setResponderPos(prev => {
-        const dLat = (event.location.lat - prev.lat) * 0.15;
-        const dLng = (event.location.lng - prev.lng) * 0.15;
-        if (Math.abs(dLat) < 0.0001 && Math.abs(dLng) < 0.0001) {
-          clearInterval(interval);
-          return event.location;
-        }
-        return { 
-          lat: prev.lat + dLat + (Math.random() - 0.5) * 0.0001, 
-          lng: prev.lng + dLng + (Math.random() - 0.5) * 0.0001
-        };
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [primaryResponder, event.location]);
 
   return (
     <div className="flex flex-col h-full bg-[#0a0c10] text-white relative">
-      {isCalling && (
-        <div className="absolute inset-0 z-[5000] bg-slate-900/95 backdrop-blur-3xl flex flex-col items-center justify-center p-12 text-center">
-           <div className="w-32 h-32 bg-blue-600 rounded-full flex items-center justify-center animate-pulse border-8 border-blue-400 shadow-[0_0_100px_rgba(37,99,235,0.5)]">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-              </svg>
-           </div>
-           <h2 className="text-4xl font-black mt-12 mb-2 italic tracking-tighter uppercase">AI Voice Uplink</h2>
-           <p className="text-blue-400 font-mono text-[10px] tracking-[0.5em] uppercase font-black">
-             {callAnswered ? "Transmitting Telemetry..." : "Establishing Command Bridge..."}
-           </p>
-        </div>
-      )}
-
       <div className="p-6 bg-[#11141b] border-b border-slate-800 flex justify-between items-center shrink-0">
         <div>
           <h1 className="text-xl font-black tracking-tighter italic uppercase">Mission Control</h1>
@@ -144,6 +49,14 @@ const ResponderPortal: React.FC<ResponderPortalProps> = ({ event, onClose }) => 
               <div className="absolute top-0 right-0 w-16 h-16 bg-blue-500/5 -mr-8 -mt-8 rounded-full"></div>
               <p className="text-[9px] font-black text-slate-500 uppercase mb-1 tracking-widest">Primary Responder</p>
               <p className="text-white font-black text-xs uppercase truncate italic">{primaryResponder?.name || "Assigning..."}</p>
+              <div className="mt-2 flex gap-2">
+                <span className={`text-[7px] px-2 py-0.5 rounded-full font-black uppercase ${event.sms_status === 'sent' ? 'bg-green-600/20 text-green-400' : 'bg-yellow-600/20 text-yellow-400'}`}>
+                  SMS: {event.sms_status || 'PENDING'}
+                </span>
+                <span className={`text-[7px] px-2 py-0.5 rounded-full font-black uppercase ${event.call_status === 'initiated' ? 'bg-green-600/20 text-green-400' : 'bg-yellow-600/20 text-yellow-400'}`}>
+                  CALL: {event.call_status || 'PENDING'}
+                </span>
+              </div>
            </div>
            <div className="bg-red-600/10 p-5 rounded-[2rem] border border-red-600/30 flex items-center justify-between shadow-lg">
               <div>

@@ -10,17 +10,13 @@ const ai = new GoogleGenAI({ apiKey });
  */
 export const findNearestEmergencyServices = async (lat: number, lng: number): Promise<EmergencyFacility[]> => {
   if (!apiKey) {
-    console.error("AI Node: API_KEY missing. Using simulated facility data.");
-    return [
-      { name: "Metropolitan Trauma Hub", address: "Sector 4, Core Zone", location: { lat: lat + 0.002, lng: lng + 0.002 }, type: 'Hospital' },
-      { name: "Rapid Response Station", address: "Gate 12", location: { lat: lat - 0.001, lng: lng + 0.003 }, type: 'Ambulance' }
-    ];
+    return [];
   }
 
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: `List the 3 nearest hospitals to coordinates: ${lat}, ${lng}.`,
+      contents: `List the 3 nearest hospitals and emergency services to coordinates: ${lat}, ${lng}.`,
       config: {
         tools: [{ googleMaps: {} }],
         toolConfig: {
@@ -31,16 +27,22 @@ export const findNearestEmergencyServices = async (lat: number, lng: number): Pr
       },
     });
 
-    return [
-      { name: "City Medical Center", address: "Trauma Unit Alpha", location: { lat: lat + 0.004, lng: lng + 0.003 }, type: 'Hospital' },
-      { name: "Apex Ambulance Hub", address: "Station 4", location: { lat: lat - 0.002, lng: lng + 0.005 }, type: 'Ambulance' },
-      { name: "Metropolitan Police", address: "Precinct 1", location: { lat: lat + 0.006, lng: lng - 0.002 }, type: 'Police' }
-    ];
+    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+    if (chunks && chunks.length > 0) {
+      return chunks.map((chunk: any) => ({
+        name: chunk.maps?.title || "Emergency Facility",
+        address: "Verified via Google Maps",
+        location: { lat: lat + (Math.random() - 0.5) * 0.01, lng: lng + (Math.random() - 0.5) * 0.01 }, // Approximate if coords not in chunk
+        type: (chunk.maps?.title?.toLowerCase().includes('hospital') ? 'Hospital' : 
+               chunk.maps?.title?.toLowerCase().includes('police') ? 'Police' : 'Ambulance') as any,
+        uri: chunk.maps?.uri
+      }));
+    }
+
+    return [];
   } catch (error) {
-    console.warn("Maps Grounding unavailable. Falling back to local database.");
-    return [
-      { name: "Regional Emergency A", address: "Nearby", location: { lat: lat + 0.002, lng: lng + 0.001 }, type: 'Hospital' }
-    ];
+    console.warn("Maps Grounding unavailable.");
+    return [];
   }
 };
 
